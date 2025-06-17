@@ -39,19 +39,23 @@ CRGB leds[NUM_LEDS];
 #define HSV_SAT_WHITE (0)
 #define HSV_SAT_COLOR (255)
 #define HSV_HUE_RED (0)
+#define HSV_HUE_YELLOW (60)
 #define HSV_HUE_GREEN (128)
-
-int price_hue=HSV_HUE_RED;
-int garage_door_open=1;
-int led_state=1;
+#define HSV_HUE_BLUE (240)
+#define HSV_HUE_MAGENTA (300)
 
 // Wi-Fi and MQTT clients
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 // Globals
-int current_power=100;
 Ticker blinker;
+bool wifi_ok = false;
+bool mqtt_ok = false;
+bool blink_on = true;
+bool garage_door_open = true;
+int price_hue = HSV_HUE_RED;
+int current_power = 100;
 
 // ==== Functions ====
 
@@ -68,35 +72,6 @@ void setRangeHSV(int startIndex, int endIndex, uint8_t hue, uint8_t sat, uint8_t
 
   for (int i = startIndex; i <= endIndex; i++) {
     leds[i] = CHSV(hue, sat, val);
-  }
-}
-
-void setup_wifi()
-{
-  delay(100);
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-  int retries = 0;
-  while (WiFi.status() != WL_CONNECTED && retries < 20)
-  {
-    delay(500);
-    Serial.print(".");
-    retries++;
-  }
-
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    Serial.println("");
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
-  }
-  else
-  {
-    Serial.println("\nFailed to connect to WiFi");
   }
 }
 
@@ -144,10 +119,10 @@ void handleRumstemp(String msg) {
 void handleGaragedoor(String msg) {
 
   int hue = HSV_HUE_RED;
-  garage_door_open = 1;
+  garage_door_open = true;
   if (msg == "CLOSED") {
     hue = HSV_HUE_GREEN;
-    garage_door_open = 0;
+    garage_door_open = false;
   }
   setLedHSV(LED_GARAGE, hue, HSV_SAT_COLOR, HSV_VAL);
   FastLED.show();
@@ -223,14 +198,62 @@ void callback(char *top, byte *payload, unsigned int length)
   }
 }
 
-void reconnect()
+void blinkIfIssue(void)
 {
+  blink_on=!blink_on;
+
+  // Garage Door
+  if (garage_door_open) {
+    setLedHSV(LED_GARAGE, HSV_HUE_RED, blink_on ? HSV_SAT_WHITE : HSV_SAT_COLOR, HSV_VAL_MAX);
+  }
+
+  //WiFi & MQTT
+  if (!wifi_ok) {
+    setRangeHSV(0, LED_MAX_POWER, blink_on ? HSV_HUE_RED : HSV_HUE_YELLOW, HSV_SAT_COLOR, HSV_VAL);
+    FastLED.show();
+  } else if (!mqtt_ok) {
+    setRangeHSV(0, LED_MAX_POWER, blink_on ? HSV_HUE_MAGENTA : HSV_HUE_BLUE, HSV_SAT_COLOR, HSV_VAL);
+    FastLED.show();
+  }
+}
+// ==== Main Setup ====
+
+void setup_wifi()
+{
+  wifi_ok = false;
+  Serial.println();
+  WiFi.mode(WIFI_STA);
+
+  int conn_stat = WL_CONNECTED + 1;
+  while (conn_stat != WL_CONNECTED) {
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+    delay(100);
+    WiFi.begin(ssid, password);
+    conn_stat = WiFi.waitForConnectResult();
+  }
+  wifi_ok = true;
+  setRangeHSV(0, LED_MAX_POWER, HSV_HUE_RED, HSV_SAT_WHITE, HSV_VAL);
+  FastLED.show();
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void connect_mqtt()
+{
+  mqtt_ok = false;
   // Loop until we're reconnected
   while (!client.connected())
   {
     Serial.print("Attempting MQTT connection...");
     if (client.connect("PowerLEDClient", mqtt_user, mqtt_pass))
     {
+      mqtt_ok = true;
+      setRangeHSV(0, LED_MAX_POWER, HSV_HUE_RED, HSV_SAT_WHITE, HSV_VAL);
+      FastLED.show();
       Serial.println("connected");
       client.subscribe(mqtt_topic);
       client.subscribe(mqtt_topic_price);
@@ -248,20 +271,6 @@ void reconnect()
     }
   }
 }
-
-void blinkIfIssue(void)
-{
-  if (garage_door_open) {
-    if (led_state) {
-    led_state=0;
-    setLedHSV(LED_GARAGE, HSV_HUE_RED, HSV_SAT_WHITE, HSV_VAL_MAX);
-    } else {
-    led_state=1;
-    setLedHSV(LED_GARAGE, HSV_HUE_RED, HSV_SAT_COLOR, HSV_VAL_MAX);
-  }
-}
-}
-// ==== Main Setup ====
 
 void setup()
 {
@@ -284,9 +293,14 @@ void setup()
 
 void loop()
 {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi lost, reconnecting...");
+    setup_wifi();
+  }
+
   if (!client.connected())
   {
-    reconnect();
+    connect_mqtt();
   }
   client.loop();
 }
