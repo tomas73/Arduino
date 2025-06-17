@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Compile LOLIN D1 Mini",
+      "type": "shell",
+      "command": "arduino-cli compile --fqbn esp8266:esp8266:d1_mini power-led.ino",
+      "group": "build"
+    },
+    {
+      "label": "Upload LOLIN D1 Mini",
+      "type": "shell",
+      "command": "arduino-cli upload -p /dev/ttyUSB0 --fqbn esp8266:esp8266:d1_mini power-led.ino",
+      "group": "build"
+    },
+    {
+      "label": "Monitor Serial",
+      "type": "shell",
+      "command": "arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200"
+    }
+  ]
+}
+
