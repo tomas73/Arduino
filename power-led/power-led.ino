@@ -111,7 +111,7 @@ void handleTariff(String msg) {
 void handleRumstemp(String msg) {
 
   int hue = HSV_HUE_RED;
-  if (msg == "LOW") hue = HSV_HUE_GREEN;
+  if (msg == "NORMAL") hue = HSV_HUE_GREEN;
   setLedHSV(LED_RUMSTEMP, hue, HSV_SAT_COLOR, HSV_VAL);
   FastLED.show();
 }
@@ -278,8 +278,8 @@ void setup()
   delay(100);
 
   FastLED.addLeds<LED_TYPE, DATA_PIN, CLK_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.setBrightness(128);
-  fill_solid(leds, NUM_LEDS, CRGB::White);
+  setRangeHSV(0, NUM_LEDS, HSV_HUE_RED, HSV_SAT_WHITE, HSV_VAL);
+
   FastLED.show();
 
   setup_wifi();
