@@ -29,6 +29,7 @@ const char *mqtt_topic_garagedoor = "garage/door_state";
 CRGB leds[NUM_LEDS];
 
 #define LED_GARAGE (NUM_LEDS - 1)
+#define LED_STATUS (NUM_LEDS - 2)
 #define LED_TARIFF_C (NUM_LEDS - 3)
 #define LED_TARIFF_B (NUM_LEDS - 4)
 #define LED_TARIFF_A (NUM_LEDS - 5)
@@ -38,11 +39,14 @@ CRGB leds[NUM_LEDS];
 #define HSV_VAL_MAX (255)
 #define HSV_SAT_WHITE (0)
 #define HSV_SAT_COLOR (255)
+
+// FastLED has HSV [0-255] not [0-360]
 #define HSV_HUE_RED (0)
-#define HSV_HUE_YELLOW (60)
-#define HSV_HUE_GREEN (128)
-#define HSV_HUE_BLUE (240)
-#define HSV_HUE_MAGENTA (300)
+#define HSV_HUE_YELLOW (32)
+#define HSV_HUE_GREEN (96)
+#define HSV_HUE_BLUE (160)
+#define HSV_HUE_MAGENTA (192)
+#define HSV_HUE_NA (0)
 
 // Wi-Fi and MQTT clients
 WiFiClient espClient;
@@ -77,10 +81,10 @@ void setRangeHSV(int startIndex, int endIndex, uint8_t hue, uint8_t sat, uint8_t
 
 void handlePower()
 {
-  int disp_power = current_power / 100;
+  int disp_power = current_power / 200; // To not saturate scale
   if (disp_power > LED_MAX_POWER) disp_power = LED_MAX_POWER;
 
-  setRangeHSV(0, LED_MAX_POWER, HSV_HUE_GREEN, HSV_SAT_WHITE, HSV_VAL);
+  setRangeHSV(0, LED_MAX_POWER, HSV_HUE_NA, HSV_SAT_WHITE, HSV_VAL);
   setRangeHSV(0, disp_power, price_hue, HSV_SAT_COLOR, HSV_VAL);
   FastLED.show();
 }
@@ -92,11 +96,10 @@ void handlePrice(String msg)
   Serial.println(current_price);
 
   if (current_price < 0) current_price=0;
-  if (current_price > 512) current_price=512;
+  if (current_price > 400) current_price=400;
 
-  int disp_color = 512 - current_price;
-  disp_color = disp_color / 4;
-  price_hue=disp_color;
+  int disp_color = 400 - current_price;
+  price_hue = disp_color / 4;
 }
 
 void handleTariff(String msg) {
@@ -205,15 +208,18 @@ void blinkIfIssue(void)
   // Garage Door
   if (garage_door_open) {
     setLedHSV(LED_GARAGE, HSV_HUE_RED, blink_on ? HSV_SAT_WHITE : HSV_SAT_COLOR, HSV_VAL_MAX);
+    Serial.println("Garage open");
   }
 
   //WiFi & MQTT
   if (!wifi_ok) {
-    setRangeHSV(0, LED_MAX_POWER, blink_on ? HSV_HUE_RED : HSV_HUE_YELLOW, HSV_SAT_COLOR, HSV_VAL);
+    setLedHSV(LED_STATUS, HSV_HUE_MAGENTA, blink_on ? HSV_SAT_WHITE : HSV_SAT_COLOR, HSV_VAL_MAX);
     FastLED.show();
+    Serial.println("WiFi lost");
   } else if (!mqtt_ok) {
-    setRangeHSV(0, LED_MAX_POWER, blink_on ? HSV_HUE_MAGENTA : HSV_HUE_BLUE, HSV_SAT_COLOR, HSV_VAL);
+    setLedHSV(LED_STATUS, HSV_HUE_BLUE, blink_on ? HSV_SAT_WHITE : HSV_SAT_COLOR, HSV_VAL_MAX);
     FastLED.show();
+    Serial.println("MQTT lost");
   }
 }
 // ==== Main Setup ====
@@ -233,7 +239,7 @@ void setup_wifi()
     conn_stat = WiFi.waitForConnectResult();
   }
   wifi_ok = true;
-  setRangeHSV(0, LED_MAX_POWER, HSV_HUE_RED, HSV_SAT_WHITE, HSV_VAL);
+  setLedHSV(LED_STATUS, HSV_HUE_NA, HSV_SAT_WHITE, HSV_VAL);
   FastLED.show();
 
   Serial.println("");
@@ -246,13 +252,13 @@ void connect_mqtt()
 {
   mqtt_ok = false;
   // Loop until we're reconnected
-  while (!client.connected())
+  if (!client.connected())
   {
     Serial.print("Attempting MQTT connection...");
     if (client.connect("PowerLEDClient", mqtt_user, mqtt_pass))
     {
       mqtt_ok = true;
-      setRangeHSV(0, LED_MAX_POWER, HSV_HUE_RED, HSV_SAT_WHITE, HSV_VAL);
+      setLedHSV(LED_STATUS, HSV_HUE_NA, HSV_SAT_WHITE, HSV_VAL);
       FastLED.show();
       Serial.println("connected");
       client.subscribe(mqtt_topic);
@@ -278,15 +284,15 @@ void setup()
   delay(100);
 
   FastLED.addLeds<LED_TYPE, DATA_PIN, CLK_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  setRangeHSV(0, NUM_LEDS, HSV_HUE_RED, HSV_SAT_WHITE, HSV_VAL);
+  setRangeHSV(0, NUM_LEDS, HSV_HUE_NA, HSV_SAT_WHITE, HSV_VAL);
 
   FastLED.show();
+  blinker.attach(0.5, blinkIfIssue); // Call every half second
 
   setup_wifi();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 
-  blinker.attach(0.5, blinkIfIssue); // Call every half second
 }
 
 // ==== Main Loop ====
@@ -302,5 +308,8 @@ void loop()
   {
     connect_mqtt();
   }
-  client.loop();
+  if (mqtt_ok)
+  {
+    client.loop();
+  }
 }
