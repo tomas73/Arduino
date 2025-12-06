@@ -1,0 +1,31 @@
+{
+  "name": "Arduino Development",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vsciot-vscode.vscode-arduino",
+        "ms-vscode.cpptools"
+      ],
+      "settings": {
+        "arduino.path": "/usr/local/bin",
+        "arduino.commandPath": "arduino-cli",
+        "arduino.useArduinoCli": true,
+        "arduino.logLevel": "info"
+      }
+    }
+  },
+  "mounts": [
+    // Mount USB devices for uploading to Arduino boards
+    "type=bind,source=/dev,target=/dev"
+  ],
+  "runArgs": [
+    "--privileged",
+    "--device=/dev/ttyUSB0",
+    "--device=/dev/ttyACM0"
+  ],
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteUser": "vscode"
+}

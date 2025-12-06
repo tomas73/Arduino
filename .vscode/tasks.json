@@ -1,0 +1,101 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Arduino: Select Board",
+      "type": "shell",
+      "command": "arduino-cli",
+      "args": ["board", "list"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Arduino: Install Libraries",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/install-libs.sh"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Compile: power-led (ESP8266)",
+      "type": "shell",
+      "command": "arduino-cli",
+      "args": [
+        "compile",
+        "--fqbn",
+        "esp8266:esp8266:d1_mini",
+        "${workspaceFolder}/projects/power-led"
+      ],
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Upload: power-led (ESP8266)",
+      "type": "shell",
+      "command": "arduino-cli",
+      "args": [
+        "upload",
+        "-p",
+        "${input:serialPort}",
+        "--fqbn",
+        "esp8266:esp8266:d1_mini",
+        "${workspaceFolder}/projects/power-led"
+      ],
+      "group": "build",
+      "problemMatcher": [],
+      "dependsOn": ["Compile: power-led (ESP8266)"]
+    },
+    {
+      "label": "Monitor: Serial",
+      "type": "shell",
+      "command": "arduino-cli",
+      "args": [
+        "monitor",
+        "-p",
+        "${input:serialPort}",
+        "-c",
+        "baudrate=${input:baudRate}"
+      ],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean Build Artifacts",
+      "type": "shell",
+      "command": "find",
+      "args": [
+        "${workspaceFolder}/projects",
+        "-type",
+        "d",
+        "-name",
+        "build",
+        "-exec",
+        "rm",
+        "-rf",
+        "{}",
+        "+"
+      ],
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "serialPort",
+      "type": "pickString",
+      "description": "Select serial port",
+      "options": [
+        "/dev/ttyUSB0",
+        "/dev/ttyUSB1",
+        "/dev/ttyACM0",
+        "/dev/ttyACM1"
+      ],
+      "default": "/dev/ttyUSB0"
+    },
+    {
+      "id": "baudRate",
+      "type": "pickString",
+      "description": "Select baud rate",
+      "options": ["9600", "115200", "230400"],
+      "default": "115200"
+    }
+  ]
+}

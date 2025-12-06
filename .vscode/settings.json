@@ -1,0 +1,21 @@
+{
+  "arduino.useArduinoCli": true,
+  "arduino.commandPath": "arduino-cli",
+  "arduino.path": "/usr/local/bin",
+  "arduino.logLevel": "info",
+  "files.associations": {
+    "*.ino": "cpp"
+  },
+  "C_Cpp.default.includePath": [
+    "${workspaceFolder}/**",
+    "~/.arduino15/**"
+  ],
+  "C_Cpp.default.defines": [
+    "ARDUINO=10819",
+    "ESP8266"
+  ],
+  "files.exclude": {
+    "**/.git": true,
+    "**/build": true
+  }
+}
